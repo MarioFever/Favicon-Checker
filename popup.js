@@ -144,15 +144,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     rawContainer.classList.remove('hidden');
     assets.forEach(asset => {
       const row = document.createElement('tr');
-      const preview = `<a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;"></a>`;
-      const downloadLink = `<a href="${asset.url}" download target="_blank" class="raw-link">Download</a>`;
       
+      // Preview Image
+      const preview = `<a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'"></a>`;
+      
+      // Details Logic
+      let detailsHtml = '';
+      
+      // Highlight Manifest
+      if (asset.source === 'manifest') {
+          detailsHtml += `<span style="display:inline-block; padding:2px 4px; background:#e0f7fa; color:#006064; border-radius:3px; font-size:10px; margin-right:5px;">Manifest</span>`;
+      } else if (asset.source === 'Root') {
+           detailsHtml += `<span style="font-size:10px; opacity:0.7;">(Implicit file at root)</span>`;
+      }
+
+      // Check for size mismatch
+      // asset.sizes is declared, asset.realSize is calculated
+      if (asset.sizes && asset.realSize && asset.sizes !== 'any' && asset.sizes !== 'unknown' && asset.realSize !== 'error') {
+          // Simple string comparison for now, can be improved for multiple sizes
+          // If declared is like "32x32" and real is "32x32", it matches.
+          // Note: manifest icons often don't have 'sizes' attribute in the scraped list unless we put it there.
+          // content.js logic for 'Scan Link Tags' puts el.getAttribute('sizes') || 'any'
+          
+          if (asset.sizes !== 'any' && asset.sizes !== asset.realSize) {
+              detailsHtml += `<div style="color:#d35400; font-size:10px; margin-top:2px;">Declared: ${asset.sizes} (Mismatch)</div>`;
+          }
+      }
+
+      // Rel / Type Column
+      let relType = asset.rel || asset.source;
+      if (asset.type && asset.type !== 'unknown') {
+          relType += ` <span style="opacity:0.6; font-size:10px;">(${asset.type})</span>`;
+      }
+
       row.innerHTML = `
+        <td><div style="font-size:11px; word-break:break-word;">${relType}</div></td>
+        <td>${asset.realSize || '-'}</td>
         <td style="text-align:center;">${preview}</td>
-        <td><span style="display:block;font-weight:600;font-size:11px;">${asset.rel}</span><span style="font-size:10px;opacity:0.7;">${asset.source}</span></td>
-        <td>${asset.sizes}</td>
-        <td>${asset.realSize}</td>
-        <td>${downloadLink}</td>
+        <td>${detailsHtml}</td>
       `;
       rawBody.appendChild(row);
     });

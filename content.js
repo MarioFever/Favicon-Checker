@@ -304,9 +304,7 @@
 
     // 2. Scan Metas
     const metaSelectors = [
-      "meta[name='msapplication-TileImage']",
-      "meta[property='og:image']",
-      "meta[name='twitter:image']"
+      "meta[name='msapplication-TileImage']"
     ];
     document.querySelectorAll(metaSelectors.join(',')).forEach(el => {
       const content = el.getAttribute('content');
