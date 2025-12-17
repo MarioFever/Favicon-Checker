@@ -356,6 +356,7 @@
                         
                         assets.push({
                             source: 'manifest',
+                            manifestUrl: manifestUrl, // Store manifest URL for linking
                             rel: 'icon', // Generic rel for manifest items
                             sizes: icon.sizes || 'unknown',
                             type: icon.type || 'unknown',
@@ -440,11 +441,16 @@
         }
     } catch(e) {}
 
-    // Enrich with Real Dimensions
+    // Enrich with Real Dimensions and Status
     for (let asset of assets) {
+      // Determine format
+      const parts = asset.url.split(/[?#]/)[0].split('.');
+      asset.format = parts.length > 1 ? parts.pop().toLowerCase() : 'unknown';
+
       // Special case: If it's the msconfig xml itself, skip image dimension check
       if (asset.rel === 'msapplication-config') {
           asset.realSize = 'xml';
+          asset.status = 'ok';
           continue;
       }
 
@@ -455,6 +461,28 @@
           asset.realSize = '1:1';
       } else {
           asset.realSize = dim;
+      }
+
+      // Determine Status and Issues
+      asset.status = 'ok';
+      asset.issue = '';
+
+      if (asset.realSize === 'error') {
+          asset.status = 'error';
+          asset.issue = 'Broken link';
+      } else if (asset.sizes && asset.sizes !== 'any' && asset.sizes !== 'unknown' && asset.realSize !== '1:1' && asset.realSize !== 'xml') {
+          // Check size mismatch
+          if (asset.sizes !== asset.realSize) {
+              // Simple string match. 
+              // TODO: Handle multiple sizes in 'sizes' attribute if needed (e.g. "32x32 48x48")
+              // For now, if exact match fails, flag it.
+              // Logic check: if sizes contains space, check if realSize is in it
+              const declaredSizes = asset.sizes.split(' ');
+              if (!declaredSizes.includes(asset.realSize)) {
+                  asset.status = 'warning';
+                  asset.issue = `Size mismatch (Declared: ${asset.sizes})`;
+              }
+          }
       }
     }
 

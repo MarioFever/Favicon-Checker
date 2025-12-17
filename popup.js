@@ -145,38 +145,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     assets.forEach(asset => {
       const row = document.createElement('tr');
       
-      // Preview Image
-      const preview = `<a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'"></a>`;
+      // Status Icon
+      let statusIcon = '';
+      if (asset.status === 'ok') {
+          statusIcon = '<span class="status-icon status-ok">✓</span>';
+      } else if (asset.status === 'warning') {
+          statusIcon = '<span class="status-icon status-warning">⚠</span>';
+      } else {
+          statusIcon = '<span class="status-icon status-error">✕</span>';
+      }
+
+      // Preview Image (with status icon)
+      const preview = `
+        <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+            ${statusIcon}
+            <a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'"></a>
+        </div>
+      `;
       
       // Details Logic
       let detailsHtml = '';
       
       // Highlight Manifest
       if (asset.source === 'manifest') {
-          detailsHtml += `<span style="display:inline-block; padding:2px 4px; background:#e0f7fa; color:#006064; border-radius:3px; font-size:10px; margin-right:5px;">Manifest</span>`;
+          const manifestLink = asset.manifestUrl ? `href="${asset.manifestUrl}" target="_blank"` : '';
+          detailsHtml += `<a ${manifestLink} style="color:inherit;text-decoration:underline;font-size:11px;">Found in manifest</a><br>`;
       } else if (asset.source === 'Root') {
-           detailsHtml += `<span style="font-size:10px; opacity:0.7;">(Implicit file at root)</span>`;
+           detailsHtml += `<span style="font-size:10px; opacity:0.7;">(Implicit file at root)</span><br>`;
       }
 
-      // Check for size mismatch
-      // asset.sizes is declared, asset.realSize is calculated
-      if (asset.sizes && asset.realSize && asset.sizes !== 'any' && asset.sizes !== 'unknown' && asset.realSize !== 'error') {
-          // Simple string comparison for now, can be improved for multiple sizes
-          // If declared is like "32x32" and real is "32x32", it matches.
-          // Note: manifest icons often don't have 'sizes' attribute in the scraped list unless we put it there.
-          // content.js logic for 'Scan Link Tags' puts el.getAttribute('sizes') || 'any'
-          
-          if (asset.sizes !== 'any' && asset.sizes !== asset.realSize) {
-              detailsHtml += `<div style="color:#d35400; font-size:10px; margin-top:2px;">Declared: ${asset.sizes} (Mismatch)</div>`;
-          }
+      // Show Issue
+      if (asset.issue) {
+           let color = asset.status === 'error' ? '#e74c3c' : '#f39c12';
+           detailsHtml += `<span style="color:${color}; font-size:10px;">${asset.issue}</span>`;
       }
 
       // Rel / Type Column
-      let relContent = `<span style="display:block;font-weight:600;font-size:11px;">${asset.rel || asset.source}</span>`;
-      let typeContent = '';
-      if (asset.type && asset.type !== 'unknown') {
-          typeContent = `<span style="display:block;font-size:10px;opacity:0.7;">${asset.type}</span>`;
+      // Line 1: Real Format (e.g. PNG, ICO) derived from content.js or URL
+      // Line 2: Declared Type or Rel
+      
+      // If content.js provides format, use it. Otherwise guess.
+      let format = asset.format ? asset.format.toUpperCase() : 'UNKNOWN';
+      if (format === 'UNKNOWN') {
+          const ext = asset.url.split('.').pop().split(/[?#]/)[0];
+          format = ext.toUpperCase();
       }
+
+      let line2 = asset.type && asset.type !== 'unknown' ? asset.type : asset.rel;
+      
+      let relContent = `<span style="display:block;font-weight:600;font-size:11px;">${format}</span>`;
+      let typeContent = `<span style="display:block;font-size:10px;opacity:0.7;">${line2}</span>`;
 
       row.innerHTML = `
         <td>${relContent}${typeContent}</td>
