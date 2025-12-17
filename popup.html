@@ -24,7 +24,11 @@
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 13px; opacity: 0.8;">Validate current page favicons</span>
-        <button id="refresh-btn" class="check-btn">Check Again</button>
+        <div style="display: flex; gap: 8px;">
+          <input type="file" id="svg-upload" accept=".svg" style="display:none">
+          <button id="generate-btn" class="check-btn" style="background: #252836; border: 1px solid #00d4aa; color: #00d4aa;">Upload SVG</button>
+          <button id="refresh-btn" class="check-btn">Check Again</button>
+        </div>
       </div>
     </header>
 
