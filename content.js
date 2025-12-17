@@ -28,11 +28,20 @@
     }
   }
 
+  // Helper to check if image is accessible
+  async function checkImage(url) {
+    if (!url) return false;
+    try {
+      const response = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+      return response.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // 1. ICO 48x48
   {
     const item = { format: 'ico', size: '48x48', type: 'image/x-icon', status: 'error', message: 'Not found', foundUrl: '' };
-    // Try finding specific 48x48 first, or just .ico
-    // Spec says: rel="icon" OR "shortcut icon" AND type="image/x-icon"
     const ico = links.find(l => {
       const rel = (l.getAttribute('rel') || '').toLowerCase();
       const type = l.getAttribute('type');
@@ -44,20 +53,23 @@
       item.foundUrl = resolveUrl(ico.getAttribute('href'));
       item.status = 'ok';
       item.message = 'Found';
-      // Validation: hosted under root?
-      try {
-        const urlObj = new URL(item.foundUrl);
-        if (urlObj.pathname !== '/favicon.ico') {
-           // It's not strictly required to be /favicon.ico if linked, but the spec image says "Has to be hosted under the root domain path"
-           // Let's check if it is at root
-           if (urlObj.pathname.split('/').length > 2) {
-             item.status = 'warning';
-             item.message = 'Not at root';
-           }
-        }
-      } catch(e) {}
+      
+      const isAccessible = await checkImage(item.foundUrl);
+      if (!isAccessible) {
+        item.status = 'error';
+        item.message = 'Broken link';
+      } else {
+        try {
+          const urlObj = new URL(item.foundUrl);
+          if (urlObj.pathname !== '/favicon.ico') {
+             if (urlObj.pathname.split('/').length > 2) {
+               item.status = 'warning';
+               item.message = 'Not at root';
+             }
+          }
+        } catch(e) {}
+      }
     } else {
-       // Check if default /favicon.ico exists? (Can't easily without fetch, but we can assume missing tag is error)
        item.message = 'Tag missing';
     }
     report.push(item);
@@ -69,8 +81,14 @@
     const png32 = findLink('icon', 'image/png', '32x32');
     if (png32) {
       item.foundUrl = resolveUrl(png32.getAttribute('href'));
-      item.status = 'ok';
-      item.message = 'Found';
+      const isAccessible = await checkImage(item.foundUrl);
+      if (isAccessible) {
+        item.status = 'ok';
+        item.message = 'Found';
+      } else {
+        item.status = 'error';
+        item.message = 'Broken link';
+      }
     }
     report.push(item);
   }
@@ -81,8 +99,14 @@
     const png16 = findLink('icon', 'image/png', '16x16');
     if (png16) {
       item.foundUrl = resolveUrl(png16.getAttribute('href'));
-      item.status = 'ok';
-      item.message = 'Found';
+      const isAccessible = await checkImage(item.foundUrl);
+      if (isAccessible) {
+        item.status = 'ok';
+        item.message = 'Found';
+      } else {
+        item.status = 'error';
+        item.message = 'Broken link';
+      }
     }
     report.push(item);
   }
@@ -90,27 +114,33 @@
   // 4. Apple Touch Icon 180x180
   {
     const item = { format: 'png', size: '180x180', type: '-', status: 'error', message: 'Not found', foundUrl: '' };
-    const apple = links.find(l => (l.getAttribute('rel') || '') === 'apple-touch-icon'); // often sizes is omitted or implied
+    const apple = links.find(l => (l.getAttribute('rel') || '') === 'apple-touch-icon');
     
     if (apple) {
         item.foundUrl = resolveUrl(apple.getAttribute('href'));
         const sizes = apple.getAttribute('sizes');
-        if (sizes === '180x180') {
-            item.status = 'ok';
-            item.message = 'Found';
+        
+        const isAccessible = await checkImage(item.foundUrl);
+        if (!isAccessible) {
+            item.status = 'error';
+            item.message = 'Broken link';
         } else {
-            item.status = 'warning';
-            item.message = `Found sizes="${sizes || 'unknown'}"`;
-        }
-        // Root check
-        try {
-            const urlObj = new URL(item.foundUrl);
-            const pathParts = urlObj.pathname.split('/').filter(p => p);
-            if (pathParts.length > 1) { // e.g. /assets/icon.png
-                 item.status = 'warning';
-                 item.message += ' (Not at root)';
+            if (sizes === '180x180') {
+                item.status = 'ok';
+                item.message = 'Found';
+            } else {
+                item.status = 'warning';
+                item.message = `Found sizes="${sizes || 'unknown'}"`;
             }
-        } catch(e) {}
+            try {
+                const urlObj = new URL(item.foundUrl);
+                const pathParts = urlObj.pathname.split('/').filter(p => p);
+                if (pathParts.length > 1) {
+                     if (item.status === 'ok') item.status = 'warning'; // Downgrade if ok
+                     item.message += ' (Not at root)';
+                }
+            } catch(e) {}
+        }
     }
     report.push(item);
   }
@@ -118,15 +148,20 @@
   // 5. Browser Config (IE/Edge) - 150x150
   {
     const item = { format: 'png', size: '150x150', type: '-', status: 'error', message: 'Not found', foundUrl: '' };
-    // Check meta name="msapplication-config"
     const msConfig = metas.find(m => m.getAttribute('name') === 'msapplication-config');
     
     if (msConfig) {
       const content = msConfig.getAttribute('content');
       item.foundUrl = resolveUrl(content);
-      item.status = 'ok';
-      item.message = 'Config file declared';
-      // Ideally we would fetch the XML and check for square150x150logo
+      const isAccessible = await checkImage(item.foundUrl);
+      
+      if (isAccessible) {
+        item.status = 'ok';
+        item.message = 'Config file declared';
+      } else {
+        item.status = 'error';
+        item.message = 'Config file broken';
+      }
     } else {
       item.message = 'Meta tag missing';
     }
@@ -154,11 +189,15 @@
                   // Check 192
                   const icon192 = icons.find(i => (i.sizes === '192x192' || i.sizes?.includes('192x192')) && i.type === 'image/png');
                   if (icon192) {
-                      item192.status = 'ok';
-                      item192.message = 'Found in manifest';
-                      item192.foundUrl = resolveUrl(icon192.src); // relative to page or manifest? Standard says relative to manifest
-                      // Actually standard says relative to manifest URL
                       item192.foundUrl = new URL(icon192.src, manifestUrl).href;
+                      const isAccessible = await checkImage(item192.foundUrl);
+                      if (isAccessible) {
+                        item192.status = 'ok';
+                        item192.message = `<a href="${manifestUrl}" target="_blank" style="color:inherit;text-decoration:underline;">Found in manifest</a>`;
+                      } else {
+                        item192.status = 'error';
+                        item192.message = 'Broken link in manifest';
+                      }
                   } else {
                       item192.message = 'Missing in manifest';
                   }
@@ -166,9 +205,15 @@
                   // Check 512
                   const icon512 = icons.find(i => (i.sizes === '512x512' || i.sizes?.includes('512x512')) && i.type === 'image/png');
                   if (icon512) {
-                      item512.status = 'ok';
-                      item512.message = 'Found in manifest';
                       item512.foundUrl = new URL(icon512.src, manifestUrl).href;
+                      const isAccessible = await checkImage(item512.foundUrl);
+                      if (isAccessible) {
+                        item512.status = 'ok';
+                        item512.message = `<a href="${manifestUrl}" target="_blank" style="color:inherit;text-decoration:underline;">Found in manifest</a>`;
+                      } else {
+                        item512.status = 'error';
+                        item512.message = 'Broken link in manifest';
+                      }
                   } else {
                       item512.message = 'Missing in manifest';
                   }
@@ -187,18 +232,29 @@
       report.push(item512);
   }
 
-  // 7. SVG Mask Icon
+  // 7. SVG Mask Icon / Main SVG
   {
       const item = { format: 'svg', size: '1:1', type: 'image/svg+xml', status: 'error', message: 'Not found', foundUrl: '' };
-      const maskIcon = findLink('mask-icon', 'image/svg+xml');
-      if (maskIcon) {
-          item.foundUrl = resolveUrl(maskIcon.getAttribute('href'));
-          item.status = 'ok';
-          item.message = 'Found';
+      // Check for mask-icon OR regular icon with svg type
+      const svgIcon = links.find(l => {
+          const rel = l.getAttribute('rel') || '';
+          const type = l.getAttribute('type');
+          return (rel.includes('icon') || rel === 'mask-icon') && type === 'image/svg+xml';
+      });
+
+      if (svgIcon) {
+          item.foundUrl = resolveUrl(svgIcon.getAttribute('href'));
+          const isAccessible = await checkImage(item.foundUrl);
+          if (isAccessible) {
+            item.status = 'ok';
+            item.message = 'Found';
+          } else {
+            item.status = 'error';
+            item.message = 'Broken link';
+          }
       }
       report.push(item);
   }
 
   return report;
 })();
-

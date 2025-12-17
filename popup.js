@@ -72,16 +72,56 @@ document.addEventListener('DOMContentLoaded', async () => {
          detailsHtml += ` <span style="font-size:10px; opacity:0.7">(${item.foundDetails})</span>`;
       }
 
+      // Action button for SVG
+      let actionHtml = '';
+      if (item.format === 'svg' && item.status === 'ok' && item.foundUrl) {
+        // Create a unique ID for this button to attach listener later
+        const btnId = 'gen-all-' + Math.random().toString(36).substr(2, 9);
+        actionHtml = `<button id="${btnId}" class="gen-mini-btn" title="Generate all formats">Gen All</button>`;
+        
+        // Defer attaching listener until after row is added
+        setTimeout(() => {
+          const btn = document.getElementById(btnId);
+          if (btn) {
+            btn.addEventListener('click', () => generateFromUrl(item.foundUrl));
+          }
+        }, 0);
+      }
+
       row.innerHTML = `
         <td>${item.format}</td>
         <td>${item.size}</td>
         <td>${item.type || '-'}</td>
         <td style="text-align: center;">${statusHtml} ${previewHtml}</td>
-        <td>${detailsHtml}</td>
+        <td style="display:flex; align-items:center; justify-content:space-between;">
+          <span>${detailsHtml}</span>
+          ${actionHtml}
+        </td>
       `;
       
       tableBody.appendChild(row);
     });
+  }
+
+  async function generateFromUrl(svgUrl) {
+    const originalText = generateBtn.textContent; // use main button as status indicator
+    generateBtn.textContent = 'Fetching SVG...';
+    generateBtn.disabled = true;
+
+    try {
+        const response = await fetch(svgUrl);
+        if (!response.ok) throw new Error('Failed to fetch SVG');
+        const svgContent = await response.text();
+        
+        await processSvgAndDownload(svgContent);
+        
+    } catch (err) {
+        console.error(err);
+        alert('Error: ' + err.message);
+    } finally {
+        generateBtn.textContent = originalText;
+        generateBtn.disabled = false;
+    }
   }
   
   async function handleSvgUpload(e) {
@@ -99,6 +139,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const svgContent = await file.text();
+      await processSvgAndDownload(svgContent);
+    } catch (err) {
+      console.error(err);
+      alert('Error generating favicons: ' + err.message);
+    } finally {
+      generateBtn.textContent = originalText;
+      generateBtn.disabled = false;
+      svgUpload.value = '';
+    }
+  }
+
+  async function processSvgAndDownload(svgContent) {
       const zip = new MinZip();
       
       // Add original SVG
@@ -116,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       const sizes = [
-        { name: 'favicon.ico', w: 48, h: 48 }, // We'll save as PNG but named .ico for simple compatibility or use a converter if needed. Chrome handles PNG-in-ICO. But let's just save as .ico file with PNG content for now as minimal solution.
+        { name: 'favicon.ico', w: 48, h: 48 },
         { name: 'favicon-32x32.png', w: 32, h: 32 },
         { name: 'favicon-16x16.png', w: 16, h: 16 },
         { name: 'apple-touch-icon.png', w: 180, h: 180 },
@@ -148,15 +200,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
       URL.revokeObjectURL(url);
-
-    } catch (err) {
-      console.error(err);
-      alert('Error generating favicons: ' + err.message);
-    } finally {
-      generateBtn.textContent = originalText;
-      generateBtn.disabled = false;
-      svgUpload.value = '';
-    }
   }
   
   scan();
