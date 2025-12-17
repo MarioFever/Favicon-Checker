@@ -339,10 +339,123 @@
       }
     }
 
+    // 4. Manifest Assets
+    try {
+        const manifestLink = document.querySelector("link[rel='manifest']");
+        if (manifestLink) {
+            const manifestUrl = resolveUrl(manifestLink.getAttribute('href'));
+            // Fetch manifest if we haven't already in the other check, or just re-fetch for simplicity/independence
+            const response = await fetch(manifestUrl);
+            if (response.ok) {
+                const json = await response.json();
+                if (json.icons && Array.isArray(json.icons)) {
+                    json.icons.forEach(icon => {
+                        const iconUrl = new URL(icon.src, manifestUrl).href;
+                        // Avoid duplicates if same URL is used in HTML
+                        if (processedUrls.has(iconUrl)) return;
+                        
+                        assets.push({
+                            source: 'manifest',
+                            rel: 'icon', // Generic rel for manifest items
+                            sizes: icon.sizes || 'unknown',
+                            type: icon.type || 'unknown',
+                            url: iconUrl
+                        });
+                        processedUrls.add(iconUrl);
+                    });
+                }
+            }
+        }
+    } catch(e) {
+        // Silent fail for manifest scan
+    }
+
+    // 5. MS Application Config
+    try {
+        const msConfig = document.querySelector("meta[name='msapplication-config']");
+        if (msConfig) {
+            const configUrl = resolveUrl(msConfig.getAttribute('content'));
+            // We'll add the config file itself as an asset, 
+            // but ideally we should parse it. For now, let's just show it's declared.
+            // Or better, fetch and parse it if possible.
+            // Let's at least show the config file exists in the list.
+             if (!processedUrls.has(configUrl)) {
+                 assets.push({
+                     source: 'Meta',
+                     rel: 'msapplication-config',
+                     sizes: 'xml', // It's an XML file
+                     type: 'application/xml',
+                     url: configUrl
+                 });
+                 processedUrls.add(configUrl);
+             }
+             
+             // Try to fetch to find TileImage inside? 
+             // Common pattern is browserconfig.xml having tile images.
+             // Parsing XML in content script is possible with DOMParser.
+             try {
+                const resp = await fetch(configUrl);
+                if (resp.ok) {
+                    const xmlText = await resp.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    const tiles = xmlDoc.querySelectorAll('TileImage');
+                    tiles.forEach(tile => {
+                        const src = tile.getAttribute('src');
+                        if (src) {
+                            const tileUrl = new URL(src, configUrl).href;
+                            if (!processedUrls.has(tileUrl)) {
+                                assets.push({
+                                    source: 'browserconfig.xml',
+                                    rel: 'TileImage',
+                                    sizes: 'unknown', // Often 150x150 but depends
+                                    type: 'image/png', // Assumption
+                                    url: tileUrl
+                                });
+                                processedUrls.add(tileUrl);
+                            }
+                        }
+                    });
+                     const square150 = xmlDoc.querySelector('square150x150logo');
+                     if (square150) {
+                         const src = square150.getAttribute('src');
+                         if(src) {
+                             const tileUrl = new URL(src, configUrl).href;
+                             if (!processedUrls.has(tileUrl)) {
+                                 assets.push({
+                                     source: 'browserconfig.xml',
+                                     rel: 'square150x150logo',
+                                     sizes: '150x150',
+                                     type: 'image/png',
+                                     url: tileUrl
+                                 });
+                                 processedUrls.add(tileUrl);
+                             }
+                         }
+                     }
+                }
+             } catch(err) {
+                 console.log("Could not parse browserconfig", err);
+             }
+        }
+    } catch(e) {}
+
     // Enrich with Real Dimensions
     for (let asset of assets) {
+      // Special case: If it's the msconfig xml itself, skip image dimension check
+      if (asset.rel === 'msapplication-config') {
+          asset.realSize = 'xml';
+          continue;
+      }
+
       const dim = await getImageDimensions(asset.url);
-      asset.realSize = dim;
+      
+      // Override for SVG
+      if ((asset.type && asset.type.includes('svg')) || asset.url.endsWith('.svg')) {
+          asset.realSize = '1:1';
+      } else {
+          asset.realSize = dim;
+      }
     }
 
     return assets;
