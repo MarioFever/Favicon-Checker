@@ -1,7 +1,27 @@
 /* ... existing styles ... */
 
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+  width: 100%; /* Ensure container takes full width */
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #1a1d2e;
+  color: #ffffff;
+  width: 650px; /* Increased width slightly to accommodate the button */
+  max-height: 800px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ... rest of styles ... */
+
 .gen-mini-btn {
-  padding: 4px 8px;
+  padding: 2px 6px; /* Reduced padding */
   background: #252836;
   border: 1px solid #00d4aa;
   border-radius: 4px;
@@ -11,9 +31,15 @@
   transition: all 0.2s;
   white-space: nowrap;
   margin-left: 8px;
+  height: 20px; /* Fixed height */
+  line-height: 14px; /* Center text */
 }
 
 .gen-mini-btn:hover {
   background: #00d4aa;
   color: #1a1d2e;
+}
+
+td {
+  vertical-align: middle; /* Align content vertically */
 }
