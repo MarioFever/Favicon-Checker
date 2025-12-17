@@ -146,25 +146,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       const row = document.createElement('tr');
       
       // Status Icon
-      let statusIcon = '';
+      let statusIconHtml = '';
       if (asset.status === 'ok') {
-          statusIcon = '<span class="status-icon status-ok">✓</span>';
+          statusIconHtml = '<span class="status-icon status-ok">✓</span>';
       } else if (asset.status === 'warning') {
-          statusIcon = '<span class="status-icon status-warning">⚠</span>';
+          statusIconHtml = '<span class="status-icon status-warning">⚠</span>';
       } else {
-          statusIcon = '<span class="status-icon status-error">✕</span>';
+          statusIconHtml = '<span class="status-icon status-error">✕</span>';
       }
 
       // Preview Image (with status icon)
+      let imgHtml = '';
+      if (asset.realSize === 'xml' || asset.format === 'XML') {
+          imgHtml = '<span style="font-size:20px;">📄</span>';
+      } else {
+          imgHtml = `<a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;"></a>`;
+      }
+
       const preview = `
-        <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
-            ${statusIcon}
-            <a href="${asset.url}" target="_blank"><img src="${asset.url}" class="preview-img" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'"></a>
+        <div class="preview-wrapper" style="display:flex; align-items:center; justify-content:center; gap:6px;">
+            <div class="status-container">${statusIconHtml}</div>
+            ${imgHtml}
         </div>
       `;
       
       // Details Logic
       let detailsHtml = '';
+      let issuesHtml = '';
       
       // Highlight Manifest
       if (asset.source === 'manifest') {
@@ -177,18 +185,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Show Issue
       if (asset.issue) {
            let color = asset.status === 'error' ? '#e74c3c' : '#f39c12';
-           detailsHtml += `<span style="color:${color}; font-size:10px;">${asset.issue}</span>`;
+           issuesHtml = `<span class="issue-text" style="color:${color}; font-size:10px;">${asset.issue}</span>`;
       }
 
       // Rel / Type Column
-      // Line 1: Real Format (e.g. PNG, ICO) derived from content.js or URL
-      // Line 2: Declared Type or Rel
-      
       // If content.js provides format, use it. Otherwise guess.
       let format = asset.format ? asset.format.toUpperCase() : 'UNKNOWN';
       if (format === 'UNKNOWN') {
           const ext = asset.url.split('.').pop().split(/[?#]/)[0];
-          format = ext.toUpperCase();
+          format = ext ? ext.toUpperCase() : '-';
       }
 
       let line2 = asset.type && asset.type !== 'unknown' ? asset.type : asset.rel;
@@ -200,9 +205,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${relContent}${typeContent}</td>
         <td>${asset.realSize || '-'}</td>
         <td style="text-align:center;">${preview}</td>
-        <td>${detailsHtml}</td>
+        <td class="details-cell">${detailsHtml}${issuesHtml}</td>
       `;
       rawBody.appendChild(row);
+
+      // Add Error Handler for Image
+      const imgEl = row.querySelector('img.preview-img');
+      if (imgEl) {
+          imgEl.addEventListener('error', () => {
+              // 1. Update Status Icon to Error
+              const statusContainer = row.querySelector('.status-container');
+              if (statusContainer) {
+                  statusContainer.innerHTML = '<span class="status-icon status-error">✕</span>';
+              }
+              
+              // 2. Update Details to show "Broken link" if not already there
+              const detailsCell = row.querySelector('.details-cell');
+              if (detailsCell) {
+                  const existingIssue = detailsCell.querySelector('.issue-text');
+                  if (!existingIssue || !existingIssue.textContent.includes('Broken')) {
+                      // If there was no previous issue or different issue, add Broken link
+                      const newIssue = document.createElement('span');
+                      newIssue.className = 'issue-text';
+                      newIssue.style.color = '#e74c3c';
+                      newIssue.style.fontSize = '10px';
+                      newIssue.style.display = 'block';
+                      newIssue.textContent = 'Broken link';
+                      detailsCell.appendChild(newIssue);
+                  }
+              }
+          });
+      }
     });
   }
 
