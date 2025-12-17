@@ -93,9 +93,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${item.size}</td>
         <td>${item.type || '-'}</td>
         <td style="text-align: center;">${statusHtml} ${previewHtml}</td>
-        <td style="display:flex; align-items:center; justify-content:space-between;">
-          <span>${detailsHtml}</span>
-          ${actionHtml}
+        <td style="vertical-align: middle;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span>${detailsHtml}</span>
+            ${actionHtml}
+          </div>
         </td>
       `;
       
