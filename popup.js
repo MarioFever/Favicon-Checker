@@ -172,13 +172,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Rel / Type Column
-      let relType = asset.rel || asset.source;
+      let relContent = `<span style="display:block;font-weight:600;font-size:11px;">${asset.rel || asset.source}</span>`;
+      let typeContent = '';
       if (asset.type && asset.type !== 'unknown') {
-          relType += ` <span style="opacity:0.6; font-size:10px;">(${asset.type})</span>`;
+          typeContent = `<span style="display:block;font-size:10px;opacity:0.7;">${asset.type}</span>`;
       }
 
       row.innerHTML = `
-        <td><div style="font-size:11px; word-break:break-word;">${relType}</div></td>
+        <td>${relContent}${typeContent}</td>
         <td>${asset.realSize || '-'}</td>
         <td style="text-align:center;">${preview}</td>
         <td>${detailsHtml}</td>
